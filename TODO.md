@@ -1,0 +1,1 @@
+- [ ] The systray feature doesn't work
