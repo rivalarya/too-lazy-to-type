@@ -7,8 +7,7 @@ A speech-to-text application that lets you dictate text instead of typing, built
 ![Too Lazy to Type Screenshot](media/screenshot.png)
 
 ## Demo
-[🎬 Watch the demo](https://insert the demo's link here)
-
+[🎬 Watch the demo](https://drive.google.com/file/d/1WziItzTM0KFKDqfcB9TdJfTsjBgWgkbB/view?usp=sharing)
 
 ## Features
 
