@@ -2,14 +2,17 @@ import customtkinter as ctk
 from pynput.keyboard import Controller
 import pyperclip
 import webbrowser
+import threading
 
 from ui.ui_helper import UIHelper
+from ui.configuration_window import ConfigurationWindow
 from utils.config_manager import ConfigManager
 from utils.history_manager import HistoryManager
 from utils.audio_recorder import AudioRecorder
 from services.transcription_service import TranscriptionService
 from utils.hotkey_manager import HotkeyManager
 from utils.paste_text_manager import PasteTextManager
+from ui.minimized_main_window import MinimizedMainWindow
 
 
 class MainApplication:
@@ -25,13 +28,6 @@ class MainApplication:
         self.root.title("Too Lazy to Type")
         self.root.geometry("800x650")
 
-        # NOW initialize variables AFTER creating root window
-        self.api_key = ctk.StringVar(self.root)
-        self.balance = ctk.StringVar(self.root)
-        self.record_hotkey = ctk.StringVar(self.root, value="ctrl+shift")
-        self.record_mode = ctk.StringVar(self.root, value="hold")
-        self._support_link = "https://www.buymeacoffee.com/TooLazyToType"
-
         # Initialize managers and services
         self.config_manager = ConfigManager()
         self.history_manager = HistoryManager(self.config_manager)
@@ -41,25 +37,48 @@ class MainApplication:
         self.keyboard = Controller()
         self.paste_text_manager = PasteTextManager()
 
+        # Load configuration
+        self.config = self.config_manager.load_config()
+
         # Initialize tracking variables
         self.recording = False
+        self.transcribing = False
         self.recording_thread = None
         self.history_items = []
 
+        # Create the configuration window (not shown yet)
+        self.config_window = ConfigurationWindow(
+            self.root,
+            self.config_manager,
+            self.hotkey_manager,
+            on_config_save=self._on_config_saved
+        )
+
+        # Create the minimized window (initially hidden)
+        self.minimized_window = MinimizedMainWindow(
+            self.root,
+            on_open_main=self._show_window,
+            on_close=self._on_minimized_window_close
+        )
+
         # Setup UI components
         self._setup_ui()
-
-        # Load configuration
-        self._load_config()
-
-        # Setup systray
-        self._setup_systray()
 
         # Set up the hotkey based on current mode
         self._update_hotkey_binding()
 
         # Set up window close handler
-        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        self.root.protocol("WM_DELETE_WINDOW", self._minimize_to_small_window)
+
+        # Determine which window to show at startup
+        self.root.after(100, self._handle_startup_window)
+
+    def _handle_startup_window(self):
+        """Determine which window to show at startup based on configuration"""
+        if self.config.get("start_minimized", False):
+            self.root.withdraw()
+            self.minimized_window.show()
+        # Otherwise the main window stays visible (default behavior)
 
     def run(self):
         """Run the application"""
@@ -71,23 +90,17 @@ class MainApplication:
         self.main_frame = ctk.CTkFrame(self.root)
         self.main_frame.pack(side=ctk.RIGHT, fill=ctk.BOTH, expand=True)
 
-        self.config_frame = ctk.CTkFrame(self.root, width=250)
-        self.config_frame.pack(side=ctk.LEFT, fill=ctk.Y)
+        self.sidebar_frame = ctk.CTkFrame(self.root, width=250)
+        self.sidebar_frame.pack(side=ctk.LEFT, fill=ctk.Y)
 
         # App title section
         self._setup_title_section()
 
-        # API Key section
-        self._setup_api_section()
-
         # Recording status section
         self._setup_status_section()
 
-        # Configuration panel
-        self._setup_config_section()
-
-        # History section
-        self._setup_history_section()
+        # Sidebar sections
+        self._setup_sidebar()
 
         # Watermark section
         self._setup_watermark_section()
@@ -109,51 +122,41 @@ class MainApplication:
             font=("Roboto", 14)
         ).pack()
 
-    def _setup_api_section(self):
-        """Set up the API key section"""
-        api_frame = ctk.CTkFrame(self.main_frame)
-        api_frame.pack(pady=20, padx=30, fill=ctk.X)
-
-        # Improved label with better spacing and font
-        ctk.CTkLabel(
-            api_frame,
-            text="OpenAI API Key:",
-            anchor="w",
-            font=("Roboto", 14)
-        ).pack(pady=(15, 5), padx=15, anchor="w")
-
-        # Improved entry field with more padding and rounded corners
-        api_entry = ctk.CTkEntry(
-            api_frame,
-            textvariable=self.api_key,
-            width=350,
-            height=38,
-            corner_radius=8,
-            border_width=2
-        )
-        api_entry.pack(pady=10, padx=15)
-
-        # Button frame with increased spacing
-        button_frame = ctk.CTkFrame(api_frame, fg_color="transparent")
-        button_frame.pack(pady=15, fill=ctk.X, padx=15)
-
-        ctk.CTkButton(
-            button_frame,
-            text="Save API Key",
-            command=self._save_config
-        ).pack(side=ctk.LEFT, padx=10)
-
-        ctk.CTkButton(
-            button_frame,
-            text="Check Balance",
-            command=self._check_balance
-        ).pack(side=ctk.LEFT, padx=10)
-
     def _setup_status_section(self):
         """Set up the recording status section"""
         status_frame = ctk.CTkFrame(self.main_frame)
         status_frame.pack(pady=15, padx=20, fill=ctk.X)
 
+        # API key status
+        api_status_frame = ctk.CTkFrame(status_frame, fg_color="transparent")
+        api_status_frame.pack(pady=10, fill=ctk.X)
+
+        api_status_text = "API Key: " + \
+            ("Configured ✓" if self.config.get("api_key") else "Not configured ✗")
+        api_status_color = "#4CAF50" if self.config.get(
+            "api_key") else "#FF5252"
+
+        api_status_label = ctk.CTkLabel(
+            api_status_frame,
+            text=api_status_text,
+            font=("Roboto", 14),
+            text_color=api_status_color
+        )
+        api_status_label.pack(side=ctk.LEFT, padx=15)
+
+        config_btn = ctk.CTkButton(
+            api_status_frame,
+            text="Open Settings",
+            command=self._open_config_window,
+            width=120
+        )
+        config_btn.pack(side=ctk.RIGHT, padx=15)
+
+        # Separator
+        separator = ctk.CTkFrame(status_frame, height=1, fg_color="#6c757d")
+        separator.pack(fill=ctk.X, padx=15, pady=10)
+
+        # Recording status
         self.record_label = ctk.CTkLabel(
             status_frame,
             text="Press hotkey to start recording",
@@ -170,56 +173,97 @@ class MainApplication:
         )
         self.status_indicator.pack(pady=5)
 
-    def _setup_config_section(self):
-        """Set up the configuration section"""
+        # Hotkey reminder
+        hotkey_reminder = ctk.CTkLabel(
+            status_frame,
+            text=f"Current hotkey: {self.config.get('record_hotkey', 'ctrl+shift')}",
+            font=("Roboto", 13),
+            text_color="#6c757d"
+        )
+        hotkey_reminder.pack(pady=(0, 10))
+
+        # Transcription status label
+        self.transcription_status = ctk.CTkLabel(
+            status_frame,
+            text="",
+            font=("Roboto", 14),
+            text_color="#3a86ff"
+        )
+        self.transcription_status.pack(pady=5)
+
+    def _setup_sidebar(self):
+        """Set up the sidebar"""
+        # Sidebar title
         ctk.CTkLabel(
-            self.config_frame,
-            text="Configuration",
+            self.sidebar_frame,
+            text="Menu",
             font=("Roboto", 18, "bold")
         ).pack(pady=15)
 
-        # Hotkey configuration
-        hotkey_frame = ctk.CTkFrame(self.config_frame)
-        hotkey_frame.pack(padx=10, pady=5, fill=ctk.X)
+        # History section - moved to top
+        self._setup_history_section()
 
-        ctk.CTkLabel(hotkey_frame, text="Record Hotkey:",
-                     anchor="w").pack(pady=5, padx=10, anchor="w")
-        hotkey_entry = ctk.CTkEntry(
-            hotkey_frame, textvariable=self.record_hotkey)
-        hotkey_entry.pack(padx=10, pady=5, fill=ctk.X)
+        # Spacer - smaller now
+        small_spacer = ctk.CTkFrame(
+            self.sidebar_frame, fg_color="transparent", height=10)
+        small_spacer.pack(pady=5)
 
-        ctk.CTkButton(
-            hotkey_frame,
-            text="Apply Hotkey",
-            command=self._update_hotkey_binding
-        ).pack(pady=10, padx=10, fill=ctk.X)
-
-        # Record mode configuration
-        mode_frame = ctk.CTkFrame(self.config_frame)
-        mode_frame.pack(padx=10, pady=10, fill=ctk.X)
-
-        ctk.CTkLabel(mode_frame, text="Record Mode:", anchor="w").pack(
-            pady=5, padx=10, anchor="w")
-        record_mode_menu = ctk.CTkOptionMenu(
-            mode_frame,
-            values=["hold", "toggle"],
-            variable=self.record_mode,
-            command=self._on_record_mode_change
+        # Sidebar buttons
+        self._create_sidebar_button(
+            "Settings",
+            self._open_config_window,
+            "⚙️"
         )
-        record_mode_menu.pack(pady=5, padx=10, fill=ctk.X)
 
-        mode_help = ctk.CTkLabel(
-            mode_frame,
-            text="Hold: Record while pressing hotkey\nToggle: Press once to start/stop",
-            justify="left",
-            font=("Roboto", 12)
+        self._create_sidebar_button(
+            "Minimize",
+            self._minimize_to_small_window,
+            "🔽"
         )
-        mode_help.pack(pady=5, padx=10, anchor="w")
+
+        self._create_sidebar_button(
+            "About",
+            self._show_about,
+            "ℹ️"
+        )
+
+        # Spacer frame to push exit button to bottom
+        spacer = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        spacer.pack(fill=ctk.BOTH, expand=True)
+
+        # Exit button at bottom
+        exit_btn = ctk.CTkButton(
+            self.sidebar_frame,
+            text="Exit Application",
+            command=self._confirm_exit,
+            fg_color="#d32f2f",
+            hover_color="#b71c1c",
+            height=40
+        )
+        exit_btn.pack(pady=15, padx=20, fill=ctk.X)
+
+    def _create_sidebar_button(self, text, command, icon="", state="normal"):
+        """Create a standardized sidebar button"""
+        btn_frame = ctk.CTkFrame(self.sidebar_frame, fg_color="transparent")
+        btn_frame.pack(fill=ctk.X, pady=5, padx=20)
+
+        button = ctk.CTkButton(
+            btn_frame,
+            text=f"{icon} {text}" if icon else text,
+            command=command,
+            anchor="w",
+            height=40,
+            corner_radius=8,
+            state=state
+        )
+        button.pack(fill=ctk.X)
+
+        return button
 
     def _setup_history_section(self):
-        """Set up the history section"""
+        """Set up the history section with improved scrolling"""
         # Create a parent frame to contain both history components
-        history_parent_frame = ctk.CTkFrame(self.config_frame)
+        history_parent_frame = ctk.CTkFrame(self.sidebar_frame)
         history_parent_frame.pack(padx=10, pady=5, fill=ctk.BOTH, expand=True)
 
         # History section label (in the parent frame)
@@ -234,16 +278,17 @@ class MainApplication:
         self.history_container.pack(padx=0, pady=3, fill=ctk.BOTH, expand=True)
 
         # Create a scrollable frame with FIXED HEIGHT for history items
+        # Add mousewheel configuration for smoother scrolling
         self.history_scroll = ctk.CTkScrollableFrame(
-            self.history_container, height=100, width=220)
+            self.history_container, height=200, width=220)
         self.history_scroll.pack(fill=ctk.BOTH, expand=True)
 
-        # History controls (in the parent frame AFTER the container)
+        # History controls
         history_ctrl_frame = ctk.CTkFrame(
             history_parent_frame, fg_color="transparent")
         history_ctrl_frame.pack(pady=3, fill=ctk.X)
 
-        # The Clear History button is now in the history_parent_frame
+        # Clear History button
         self.clear_history_btn = ctk.CTkButton(
             history_ctrl_frame,
             text="Clear History",
@@ -252,6 +297,9 @@ class MainApplication:
             hover_color="#b71c1c"
         )
         self.clear_history_btn.pack(pady=10, fill=ctk.X)
+
+        # Update the history display
+        self._update_history_display()
 
     def _setup_watermark_section(self):
         """Set up the watermark section"""
@@ -274,42 +322,74 @@ class MainApplication:
             hover_color="black"
         ).pack(pady=(0, 10))
 
-    def _setup_systray(self):
-        """Set up system tray functionality"""
-        self.systray_menu = ctk.CTkToplevel(self.root)
-        self.systray_menu.geometry("200x100")
-        self.systray_menu.withdraw()
+    def _open_config_window(self):
+        """Open the configuration window"""
+        self.config_window.show()
 
-        ctk.CTkLabel(
-            self.systray_menu, text="Whisper AI is running in the background").pack(pady=10)
-        ctk.CTkButton(self.systray_menu, text="Open",
-                      command=self._show_window).pack(pady=5)
-        ctk.CTkButton(self.systray_menu, text="Exit",
-                      command=self._on_close).pack(pady=5)
+    def _on_config_saved(self):
+        """Handle configuration save event"""
+        # Reload configuration
+        self.config = self.config_manager.load_config()
 
-    def _on_record_mode_change(self, _=None):
-        """Handle record mode change"""
+        # Update API key in transcription service
+        self.transcription_service.set_api_key(self.config.get("api_key", ""))
+
+        # Update hotkey binding
         self._update_hotkey_binding()
+
+        # Update UI elements that display configuration values
+        self._update_config_display()
+
+    def _update_config_display(self):
+        """Update UI elements that display configuration values"""
+        # Update API status in the main window
+        api_status_text = "API Key: " + \
+            ("Configured ✓" if self.config.get("api_key") else "Not configured ✗")
+        api_status_color = "#4CAF50" if self.config.get(
+            "api_key") else "#FF5252"
+
+        # Find the API status label
+        for widget in self.root.winfo_children():
+            if isinstance(widget, ctk.CTkFrame):
+                for child in widget.winfo_children():
+                    if isinstance(child, ctk.CTkFrame):
+                        for grandchild in child.winfo_children():
+                            if isinstance(grandchild, ctk.CTkFrame) and grandchild.winfo_name() == "api_status_frame":
+                                for label in grandchild.winfo_children():
+                                    if isinstance(label, ctk.CTkLabel):
+                                        label.configure(
+                                            text=api_status_text, text_color=api_status_color)
+
+        # Update hotkey reminder
+        for widget in self.root.winfo_children():
+            if isinstance(widget, ctk.CTkFrame):
+                for child in widget.winfo_children():
+                    if isinstance(child, ctk.CTkFrame):
+                        for grandchild in child.winfo_children():
+                            if isinstance(grandchild, ctk.CTkLabel) and "hotkey" in str(grandchild.cget("text")).lower():
+                                grandchild.configure(
+                                    text=f"Current hotkey: {self.config.get('record_hotkey', 'ctrl+shift')}")
 
     def _update_hotkey_binding(self):
         """Update hotkey binding based on current settings"""
         self.hotkey_manager.set_hotkey(
-            self.record_hotkey.get(),
-            self.record_mode.get(),
-            self._on_hotkey_press,  # No event parameter needed now
-            self._on_hotkey_release if self.record_mode.get() == "hold" else None
+            self.config.get("record_hotkey", "ctrl+shift"),
+            self.config.get("record_mode", "hold"),
+            self._on_hotkey_press,
+            self._on_hotkey_release if self.config.get(
+                "record_mode", "hold") == "hold" else None
         )
 
     def _on_hotkey_press(self):
         """Handle hotkey press event - no event parameter needed"""
-        if self.record_mode.get() == "hold":
+        if self.config.get("record_mode", "hold") == "hold":
             self._start_recording()
         else:
             self._toggle_recording()
 
     def _on_hotkey_release(self):
         """Handle hotkey release event - no event parameter needed"""
-        if self.record_mode.get() == "hold" and self.recording:
+        if self.config.get("record_mode", "hold") == "hold" and self.recording:
             self._stop_recording()
 
     def _toggle_recording(self):
@@ -323,16 +403,25 @@ class MainApplication:
         """Start recording audio"""
         if not self.recording:
             self.recording = True
+            # Update main window status
             self.record_label.configure(text="Recording in progress...")
             self.status_indicator.configure(text="🔴", text_color="#d32f2f")
+
+            # Update minimized window status
+            self.minimized_window.update_recording_status(True)
+
             self.recording_thread = self.audio_recorder.start_recording()
 
     def _stop_recording(self):
         """Stop recording audio"""
         if self.recording:
             self.recording = False
+            # Update main window status
             self.record_label.configure(text="Press hotkey to start recording")
             self.status_indicator.configure(text="⚫", text_color="gray")
+
+            # Update minimized window status
+            self.minimized_window.update_recording_status(False)
 
             # Stop recording and process the audio
             self.audio_recorder.stop_recording()
@@ -342,34 +431,66 @@ class MainApplication:
             # Save and transcribe the audio
             filename = self.audio_recorder.save_audio()
             if filename:
-                self._transcribe_audio(filename)
+                # Show transcribing status
+                self.transcribing = True
+                self.transcription_status.configure(
+                    text="Transcribing... Please wait")
 
-    def _transcribe_audio(self, filename):
-        """Transcribe recorded audio file"""
+                # Update minimized window status
+                self.minimized_window.update_transcription_status(True)
+
+                # Start transcription in a separate thread
+                threading.Thread(target=self._transcribe_audio_thread, args=(
+                    filename,), daemon=True).start()
+
+    def _transcribe_audio_thread(self, filename):
+        """Transcribe audio in a separate thread to keep UI responsive"""
         try:
             # Get the selected model from config
-            config = self.config_manager.load_config()
-            selected_model = config.get("stt_model", "whisper-1")
+            selected_model = self.config.get("stt_model", "whisper-1")
 
             # Set the API key and transcribe
-            self.transcription_service.set_api_key(self.api_key.get())
+            self.transcription_service.set_api_key(
+                self.config.get("api_key", ""))
             transcription_text = self.transcription_service.transcribe(
                 filename, selected_model)
 
-            # Add to history and update display
-            self.history_manager.add_entry(transcription_text)
-            self._update_history_display()
-
-            # Paste the text into the active application
-            self._paste_text(transcription_text)
+            # Use after() to update UI from the main thread
+            self.root.after(
+                0, lambda: self._handle_transcription_result(transcription_text))
 
         except Exception as api_error:
             error_str = str(api_error)
+            # Use after() to show error from the main thread
             if "401" in error_str and "invalid_api_key" in error_str:
-                self._show_api_key_error(
-                    "Your OpenAI API key appears to be invalid. Please check your API key.")
+                self.root.after(0, lambda: self._show_api_key_error(
+                    "Your OpenAI API key appears to be invalid. Please check your API key."))
             else:
-                self._show_error_window(f"API Error: {error_str}")
+                self.root.after(0, lambda: self._show_error_window(
+                    f"API Error: {error_str}"))
+
+            # Clear transcribing status
+            self.root.after(0, self._clear_transcription_status)
+
+    def _handle_transcription_result(self, transcription_text):
+        """Handle successful transcription result"""
+        # Add to history and update display
+        self.history_manager.add_entry(transcription_text)
+        self._update_history_display()
+
+        # Paste the text into the active application
+        self._paste_text(transcription_text)
+
+        # Clear transcribing status
+        self._clear_transcription_status()
+
+    def _clear_transcription_status(self):
+        """Clear the transcription status message"""
+        self.transcribing = False
+        self.transcription_status.configure(text="")
+
+        # Update minimized window status
+        self.minimized_window.update_transcription_status(False)
 
     def _paste_text(self, text):
         self.paste_text_manager.paste_text(text)
@@ -477,36 +598,57 @@ class MainApplication:
             command=details_window.destroy
         ).pack(side=ctk.RIGHT, padx=5)
 
-    def _check_balance(self):
-        """Check API balance"""
-        info_window = UIHelper.create_modal_window(
-            self.root, "Balance Information", "400x200")
+    def _show_about(self):
+        """Show about dialog"""
+        about_window = UIHelper.create_modal_window(
+            self.root, "About Too Lazy to Type", "400x300")
 
+        # App logo
+        logo_frame = ctk.CTkFrame(about_window, fg_color="transparent")
+        logo_frame.pack(pady=(15, 5))
+
+        logo_text = ctk.CTkLabel(
+            logo_frame,
+            text="Too Lazy to Type",
+            font=("Arial", 24, "bold"),
+            text_color="#3a86ff"
+        )
+        logo_text.pack()
+
+        # Version
         ctk.CTkLabel(
-            info_window,
-            text="The OpenAI balance information can only be accessed through a browser.",
+            about_window,
+            text="Version 1.0.0",
+            font=("Roboto", 14)
+        ).pack(pady=(0, 10))
+
+        # Description
+        ctk.CTkLabel(
+            about_window,
+            text="A simple speech-to-text application for when you're\ntoo lazy to type. Just press the hotkey and speak!",
             wraplength=350
-        ).pack(pady=10)
-
-        ctk.CTkLabel(
-            info_window,
-            text="Please visit the OpenAI dashboard to check your current balance."
         ).pack(pady=5)
 
-        def open_dashboard():
-            webbrowser.open("https://platform.openai.com/account/usage")
-            info_window.destroy()
+        # Creator info
+        ctk.CTkLabel(
+            about_window,
+            text="Created by rivalarya",
+            font=("Roboto", 12)
+        ).pack(pady=(10, 0))
 
-        ctk.CTkButton(
-            info_window,
-            text="Open Dashboard",
-            command=open_dashboard
-        ).pack(pady=10)
+        # GitHub link
+        github_btn = ctk.CTkButton(
+            about_window,
+            text="Visit GitHub Repository",
+            command=lambda: webbrowser.open("https://github.com/rivalarya/too-lazy-to-type")
+        )
+        github_btn.pack(pady=10)
 
+        # Close button
         ctk.CTkButton(
-            info_window,
+            about_window,
             text="Close",
-            command=info_window.destroy
+            command=about_window.destroy
         ).pack(pady=5)
 
     def _show_error_window(self, message):
@@ -573,42 +715,64 @@ class MainApplication:
         )
         open_button.pack(side=ctk.LEFT, padx=20)
 
+        open_config_button = ctk.CTkButton(
+            btn_frame,
+            text="Open Settings",
+            command=lambda: (error_window.destroy(),
+                             self._open_config_window()),
+            width=120
+        )
+        open_config_button.pack(side=ctk.LEFT, padx=5)
+
         ok_button = ctk.CTkButton(
             btn_frame,
             text="OK",
             command=error_window.destroy,
-            width=100
+            width=80
         )
         ok_button.pack(side=ctk.RIGHT, padx=20)
+
+    def _confirm_exit(self):
+        """Confirm before exiting the application"""
+        UIHelper.show_confirmation(
+            self.root,
+            "Are you sure you want to exit the application?",
+            on_confirm=self._on_close
+        )
 
     def _show_window(self):
         """Show the main window"""
         self.root.deiconify()
-        self.systray_menu.withdraw()
+        self.root.lift()
+        self.root.focus_force()
 
-    def _load_config(self):
-        """Load configuration from file"""
-        config = self.config_manager.load_config()
-        self.api_key.set(config.get("api_key", ""))
-        self.record_hotkey.set(config.get("record_hotkey", "ctrl+shift"))
-        self.record_mode.set(config.get("record_mode", "hold"))
-        self._update_history_display()
+        # Hide the minimized window
+        self.minimized_window.hide()
 
-    def _save_config(self):
-        """Save configuration to file"""
-        config = self.config_manager.load_config()
-        config["api_key"] = self.api_key.get()
-        config["record_hotkey"] = self.record_hotkey.get()
-        config["record_mode"] = self.record_mode.get()
-        self.config_manager.save_config(config)
+    def _minimize_to_small_window(self):
+        """Minimize the application to small status window"""
+        self.config_manager.save_config(self.config)
+        self.root.withdraw()
 
-        # Update the API key in the transcription service
-        self.transcription_service.set_api_key(self.api_key.get())
+        # Show the minimized window and update its status
+        self.minimized_window.update_recording_status(self.recording)
+        self.minimized_window.update_transcription_status(
+            self.transcribing,
+            "Transcribing... Please wait" if self.transcribing else ""
+        )
+        self.minimized_window.show()
 
-        # Show confirmation
-        UIHelper.show_notification(self.root, "Settings saved!")
+    def _on_minimized_window_close(self):
+        """Handle minimized window close"""
+        # Show a confirmation dialog
+        UIHelper.show_confirmation(
+            self.minimized_window.window,
+            "Do you want to exit the application?",
+            on_confirm=self._on_close,
+            on_cancel=lambda: self.minimized_window.show()
+        )
 
     def _on_close(self):
-        """Handle window close event"""
-        self._save_config()
+        """Handle window close event - fully exit the application"""
+        self.config_manager.save_config(self.config)
         self.root.quit()

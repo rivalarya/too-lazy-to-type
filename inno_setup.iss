@@ -2,7 +2,7 @@
 AppName=TooLazyToType
 AppPublisher=Rival Arya Pirmansah
 AppPublisherURL=https://github.com/rivalarya/too-lazy-to-type.git
-AppVersion=1.0
+AppVersion=1.1.0
 DefaultDirName={localappdata}\TooLazyToType
 DefaultGroupName=TooLazyToType
 OutputDir=installer_output

@@ -15,7 +15,6 @@ A speech-to-text application that lets you dictate text instead of typing, built
 - **Customizable Hotkeys**: Set your own keyboard shortcut for recording
 - **Multiple Recording Modes**: Choose between "hold" (record while pressing) or "toggle" (press once to start/stop)
 - **History Management**: Access your previous transcriptions with one click
-- ~~**System Tray Support**: Application can run in the background for easy access~~
 
 ## End User Instructions
 If you're not familiar with coding, you can simply download the .exe file [here](https://github.com/rivalarya/too-lazy-to-type/releases/latest). **And make sure you have  [OpenAI API Key](https://platform.openai.com/account/api-keys).**
@@ -72,6 +71,7 @@ All settings are automatically saved for future use.
     ├── ui/                          # UI related modules
     │   ├── __init__.py
     │   ├── main_window.py           # Main application window
+    │   ├── minimized_main_window.py # A window for when the application is minimized
     │   └── ui_helper.py             # Helper functions for UI
     └── utils/                       # Utility modules
         ├── __init__.py
