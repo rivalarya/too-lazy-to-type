@@ -14,7 +14,7 @@ class ConfigManager:
             "record_hotkey": "ctrl+shift",
             "record_mode": "hold",
             "history": [],
-            "stt_model": "gpt-4o-mini-transcribe"
+            "stt_model": "nova-3"
         }
 
     def load_config(self):

@@ -434,7 +434,7 @@ class MainApplication:
         """Transcribe audio in a separate thread to keep UI responsive"""
         try:
             # Get the selected model from config
-            selected_model = self.config.get("stt_model", "whisper-1")
+            selected_model = self.config.get("stt_model", "nova-3")
 
             # Set the API key and transcribe
             self.transcription_service.set_api_key(
@@ -451,7 +451,7 @@ class MainApplication:
             # Use after() to show error from the main thread
             if "401" in error_str and "invalid_api_key" in error_str:
                 self.root.after(0, lambda: self._show_api_key_error(
-                    "Your OpenAI API key appears to be invalid. Please check your API key."))
+                    "Your Deepgram API key appears to be invalid. Please check your API key."))
             else:
                 self.root.after(0, lambda: self._show_error_window(
                     f"API Error: {error_str}"))
@@ -678,7 +678,7 @@ class MainApplication:
         # URL text (styled to look like a link)
         url_label = ctk.CTkLabel(
             error_window,
-            text="https://platform.openai.com/account/api-keys",
+            text="https://console.deepgram.com/project",
             font=("Arial", 12, "underline"),
             text_color="#3a86ff",
             cursor="hand2"
@@ -687,7 +687,7 @@ class MainApplication:
 
         # Bind click event to open the URL
         url_label.bind(
-            "<Button-1>", lambda e: webbrowser.open("https://platform.openai.com/account/api-keys"))
+            "<Button-1>", lambda e: webbrowser.open("https://console.deepgram.com/project"))
 
         # Buttons frame
         btn_frame = ctk.CTkFrame(error_window, fg_color="transparent")
@@ -698,7 +698,7 @@ class MainApplication:
             btn_frame,
             text="Open API Keys Page",
             command=lambda: webbrowser.open(
-                "https://platform.openai.com/account/api-keys"),
+                "https://console.deepgram.com/project"),
             width=150
         )
         open_button.pack(side=ctk.LEFT, padx=20)

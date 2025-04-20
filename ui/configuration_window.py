@@ -123,7 +123,7 @@ class ConfigurationWindow:
     def _setup_api_section(self, parent):
         """Set up the API key section"""
         section_frame = self._create_section_frame(
-            parent, "OpenAI API Configuration")
+            parent, "Deepgram API Configuration")
 
         # API Key entry
         ctk.CTkLabel(
@@ -140,7 +140,7 @@ class ConfigurationWindow:
             height=38,
             corner_radius=8,
             border_width=2,
-            placeholder_text="Enter your OpenAI API key here"
+            placeholder_text="Enter your Deepgram API key here"
         )
         api_entry.pack(pady=5, padx=10, fill=ctk.X)
 
@@ -159,7 +159,7 @@ class ConfigurationWindow:
             link_frame,
             text="Get API Key",
             command=lambda: webbrowser.open(
-                "https://platform.openai.com/account/api-keys"),
+                "https://console.deepgram.com/project"),
             width=150,
             fg_color="#6c757d",
             hover_color="#495057"
@@ -314,23 +314,23 @@ class ConfigurationWindow:
         self.window.destroy()
 
     def _check_balance(self):
-        """Show OpenAI balance information"""
+        """Show Deepgram balance information"""
         info_window = UIHelper.create_modal_window(
             self.window, "Balance Information", "400x200")
 
         ctk.CTkLabel(
             info_window,
-            text="The OpenAI balance information can only be accessed through a browser.",
+            text="The Deepgram balance information can only be accessed through a browser.",
             wraplength=350
         ).pack(pady=10)
 
         ctk.CTkLabel(
             info_window,
-            text="Please visit the OpenAI dashboard to check your current balance."
+            text="Please visit the Deepgram dashboard to check your current balance."
         ).pack(pady=5)
 
         def open_dashboard():
-            webbrowser.open("https://platform.openai.com/account/usage")
+            webbrowser.open("https://console.deepgram.com/project")
             info_window.destroy()
 
         ctk.CTkButton(

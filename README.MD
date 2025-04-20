@@ -1,8 +1,8 @@
 # Too Lazy to Type
 
-A speech-to-text application that lets you dictate text instead of typing, built using Python, CustomTkinter, and OpenAI's Whisper API.
+A speech-to-text application that lets you dictate text instead of typing, built using Python, CustomTkinter, and Deepgram API.
 
-> Sometimes I prefer dictating text rather than typing it. While Windows has a built-in speech-to-text feature, I have to change my system language first before I can speak in that language, which is inconvenient. After searching for alternatives, I came across WhisperTyping. It’s free for now, but according to their FAQ, they plan to charge users in the future. Since I already have an OpenAI account, I decided to create my own program instead—this way, I can keep using it without worrying about switching apps later on.
+> On the `main` branch, I use Whisper as the transcription service. However, when I searched for an alternative, I found Deepgram. Why am I changing the service? Because Deepgram offers $200 in free credit, hehe.
 
 ![Too Lazy to Type Screenshot](media/screenshot.png)
 
@@ -11,20 +11,20 @@ A speech-to-text application that lets you dictate text instead of typing, built
 
 ## Features
 
-- **Voice-to-Text Conversion**: Record your voice and convert it to text using OpenAI's Whisper API
+- **Voice-to-Text Conversion**: Record your voice and convert it to text using Deepgram API
 - **Customizable Hotkeys**: Set your own keyboard shortcut for recording
 - **Multiple Recording Modes**: Choose between "hold" (record while pressing) or "toggle" (press once to start/stop)
 - **History Management**: Access your previous transcriptions with one click
 
 ## End User Instructions
-If you're not familiar with coding, you can simply download the .exe file [here](https://github.com/rivalarya/too-lazy-to-type/releases/latest). **And make sure you have  [OpenAI API Key](https://platform.openai.com/account/api-keys).**
+If you're not familiar with coding, you can simply download the .exe file [here](https://github.com/rivalarya/too-lazy-to-type/releases/latest). **And make sure you have  [Deepgram API Key](https://console.deepgram.com/project).**
 
 But if you are comfortable with code, here's how to use the application:
 
 ## Requirements
 
 - Python 3.10+
-- OpenAI API Key (for Whisper speech-to-text service). Visit [OpenAI API Keys](https://platform.openai.com/account/api-keys) for more information
+- Deepgram API Key (for Whisper speech-to-text service). Visit [Deepgram API Keys](https://console.deepgram.com/project) for more information
 - Internet connection (for API access)
 
 ## Installation
@@ -49,7 +49,7 @@ But if you are comfortable with code, here's how to use the application:
 
 On first run, you'll need to:
 
-1. Enter your OpenAI API key in the main window
+1. Enter your Deepgram API key in the main window
 2. Set your preferred hotkey combination
 3. Choose your recording mode (hold or toggle)
 
@@ -67,7 +67,7 @@ All settings are automatically saved for future use.
     ├── .gitignore                   # Git ignore file
     ├── services/                    # Service modules
     │   ├── __init__.py
-    │   └── transcription_service.py # Transcription handling with OpenAI
+    │   └── transcription_service.py # Transcription handling with Deepgram
     ├── ui/                          # UI related modules
     │   ├── __init__.py
     │   ├── main_window.py           # Main application window
@@ -85,7 +85,7 @@ All settings are automatically saved for future use.
 ## How to Use
 
 1. Launch the application
-2. Enter your OpenAI API key and save it
+2. Enter your Deepgram API key and save it
 3. Press your configured hotkey to start recording
 4. Speak clearly into your microphone
 5. Release the hotkey (or press again in toggle mode) to stop recording
@@ -127,9 +127,9 @@ If text doesn't paste correctly:
 ### API Key Issues
 
 If you receive an API key error:
-1. Verify your OpenAI API key is correct
+1. Verify your Deepgram API key is correct
 2. Check that your account has access to the Whisper API
-3. Ensure you have sufficient credits in your OpenAI account
+3. Ensure you have sufficient credits in your Deepgram account
 
 ### Recording Problems
 
@@ -144,7 +144,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 ## Acknowledgments
 
-- [OpenAI Whisper API](https://platform.openai.com/docs/guides/speech-to-text) for speech recognition
+- [Deepgram API](https://deepgram.com/) for speech recognition
 - [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) for the modern UI
 - [PyAudio](https://people.csail.mit.edu/hubert/pyaudio/) for audio recording functionality
 - [keyboard](https://github.com/boppreh/keyboard) for global hotkey support
