@@ -605,7 +605,7 @@ class MainApplication:
         # Version
         ctk.CTkLabel(
             about_window,
-            text="Version 1.0.0",
+            text="Version 1.1.0",
             font=("Roboto", 14)
         ).pack(pady=(0, 10))
 
