@@ -136,13 +136,13 @@ class MainApplication:
         api_status_color = "#4CAF50" if self.config.get(
             "api_key") else "#FF5252"
 
-        api_status_label = ctk.CTkLabel(
+        self.api_status_label = ctk.CTkLabel(
             api_status_frame,
             text=api_status_text,
             font=("Roboto", 14),
             text_color=api_status_color
         )
-        api_status_label.pack(side=ctk.LEFT, padx=15)
+        self.api_status_label.pack(side=ctk.LEFT, padx=15)
 
         config_btn = ctk.CTkButton(
             api_status_frame,
@@ -174,13 +174,13 @@ class MainApplication:
         self.status_indicator.pack(pady=5)
 
         # Hotkey reminder
-        hotkey_reminder = ctk.CTkLabel(
+        self.hotkey_reminder = ctk.CTkLabel(
             status_frame,
             text=f"Current hotkey: {self.config.get('record_hotkey', 'ctrl+shift')}",
             font=("Roboto", 13),
             text_color="#6c757d"
         )
-        hotkey_reminder.pack(pady=(0, 10))
+        self.hotkey_reminder.pack(pady=(0, 10))
 
         # Transcription status label
         self.transcription_status = ctk.CTkLabel(
@@ -348,27 +348,14 @@ class MainApplication:
         api_status_color = "#4CAF50" if self.config.get(
             "api_key") else "#FF5252"
 
-        # Find the API status label
-        for widget in self.root.winfo_children():
-            if isinstance(widget, ctk.CTkFrame):
-                for child in widget.winfo_children():
-                    if isinstance(child, ctk.CTkFrame):
-                        for grandchild in child.winfo_children():
-                            if isinstance(grandchild, ctk.CTkFrame) and grandchild.winfo_name() == "api_status_frame":
-                                for label in grandchild.winfo_children():
-                                    if isinstance(label, ctk.CTkLabel):
-                                        label.configure(
-                                            text=api_status_text, text_color=api_status_color)
+        # Use direct references to UI elements
+        if hasattr(self, 'api_status_label'):
+            self.api_status_label.configure(
+                text=api_status_text, text_color=api_status_color)
 
-        # Update hotkey reminder
-        for widget in self.root.winfo_children():
-            if isinstance(widget, ctk.CTkFrame):
-                for child in widget.winfo_children():
-                    if isinstance(child, ctk.CTkFrame):
-                        for grandchild in child.winfo_children():
-                            if isinstance(grandchild, ctk.CTkLabel) and "hotkey" in str(grandchild.cget("text")).lower():
-                                grandchild.configure(
-                                    text=f"Current hotkey: {self.config.get('record_hotkey', 'ctrl+shift')}")
+        if hasattr(self, 'hotkey_reminder'):
+            self.hotkey_reminder.configure(
+                text=f"Current hotkey: {self.config.get('record_hotkey', 'ctrl+shift')}")
 
     def _update_hotkey_binding(self):
         """Update hotkey binding based on current settings"""
@@ -640,7 +627,8 @@ class MainApplication:
         github_btn = ctk.CTkButton(
             about_window,
             text="Visit GitHub Repository",
-            command=lambda: webbrowser.open("https://github.com/rivalarya/too-lazy-to-type")
+            command=lambda: webbrowser.open(
+                "https://github.com/rivalarya/too-lazy-to-type")
         )
         github_btn.pack(pady=10)
 

@@ -1,2 +1,2 @@
-- [ ] label API status in the main window should be updated when save configuration button is clicked
+- [x] label API status in the main window should be updated when save configuration button is clicked
 - [ ] Make the scrollable frame more smooth when scrolling
